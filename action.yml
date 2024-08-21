@@ -29,8 +29,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Send request to DeployHQ
-      shell: bash
+    - shell: bash
       run: |
         HTTP_RESPONSE=$(curl -u ${{ inputs.username }}:${{ inputs.password }} \
                               -sS "https://${{ inputs.account }}.deployhq.com/projects/${{ inputs.project }}/deployments/" \
@@ -38,13 +37,10 @@ runs:
                               -H "Accept: application/json" \
                               -w "HTTP_STATUS:%{http_code}" \
                               --data '{"deployment":{ "parent_identifier": "${{ inputs.server }}", "start_revision": "", "end_revision": "${{ inputs.end }}", "branch": "${{ inputs.branch }}"}}')
-    - name: Handle response
-      shell: bash
-      run: |
         echo "response-body=$(echo "${HTTP_RESPONSE}" | sed -E 's/HTTP_STATUS\:[0-9]{3}$//')" >> $GITHUB_OUTPUT
         HTTP_STATUS=$(echo "${HTTP_RESPONSE}" | tr -d '\n' | sed -E 's/.*HTTP_STATUS:([0-9]{3})$/\1/')
 
-        echo $HTTP_STATUS
+        echo "${HTTP_STATUS}"
         # Fail pipeline and print errors if API doesn't return an OK status.
         if [[ "${HTTP_STATUS}" -eq 201 ]]; then
           exit 0
