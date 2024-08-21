@@ -1,9 +1,52 @@
-name: "DeployHQ - Trigger a Deployment with a webhook"
-description: "Trigger a given deployment using DeployHQ's Webhook."
-author: facundofarias
-runs:
-  using: docker
-  image: Dockerfile
+name: "DeployHQ - Trigger a Deployment via the API"
+description: "Trigger a given deployment using DeployHQ's API."
+author: jmsfwk
 branding:
-  color: purple
+  color: blue
   icon: upload-cloud
+inputs:
+  account:
+    description: The name of the account in DeployHQ
+    required: true
+  username:
+    description: The DeployHQ username
+    required: true
+  password:
+    description: The API key for the user
+    required: true
+  project:
+    description: The permalink of the project
+    required: true
+  server:
+    description: The UUID of the server or server group to deploy to
+    required: true
+  end:
+    description: The end revision of the deployment
+    required: true
+  branch:
+    description: The branch to deploy from
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Send request to DeployHQ
+      shell: bash
+      run: |
+        HTTP_RESPONSE=$(curl -u ${{ inputs.username }}:${{ inputs.password }} \
+                              -sS "https://${{ inputs.account }}.deployhq.com/projects/${{ inputs.project }}/deployments/" \
+                              -H "Content-type: application/json" \
+                              -H "Accept: application/json" \
+                              -w "HTTP_STATUS:%{http_code}" \
+                              --data '{"deployment":{ "parent_identifier": "${{ inputs.server }}", "start_revision": "", "end_revision": "${{ inputs.end }}", "branch": "${{ inputs.branch }}"}}')
+    - name: Handle response
+      shell: bash
+      run: |
+        echo "response-body=$(echo "${HTTP_RESPONSE}" | sed -E 's/HTTP_STATUS\:[0-9]{3}$//')" >> $GITHUB_OUTPUT
+        HTTP_STATUS=$(echo "${HTTP_RESPONSE}" | tr -d '\n' | sed -E 's/.*HTTP_STATUS:([0-9]{3})$/\1/')
+
+        # Fail pipeline and print errors if API doesn't return an OK status.
+        if [ "${HTTP_STATUS}" -eq "200" ]; then
+          exit 0
+        else
+          exit 1
+        fi
